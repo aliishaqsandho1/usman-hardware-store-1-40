@@ -7,6 +7,15 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Package, Search, Plus, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { productsApi, categoriesApi, unitsApi } from "@/services/api";
@@ -34,7 +43,7 @@ const Products = () => {
   });
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1); // Reset to page 1 when search or filter changes
     fetchCategories();
     fetchUnits();
   }, [searchTerm, categoryFilter]);
@@ -143,6 +152,12 @@ const Products = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= pagination.totalPages) {
+      fetchProducts(page);
     }
   };
 
@@ -466,7 +481,14 @@ const Products = () => {
       {/* Products Grid */}
       <Card className="flex-1">
         <CardHeader>
-          <CardTitle>Product Inventory</CardTitle>
+          <CardTitle>
+            Product Inventory 
+            {pagination.totalItems > 0 && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({pagination.totalItems} total items)
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="pb-6">
           {loading ? (
@@ -478,59 +500,145 @@ const Products = () => {
               <div className="text-lg text-muted-foreground">No products found</div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto">
-              {products.map((product) => (
-                <Card key={product.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-foreground text-sm">{product.name}</h3>
-                          <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto">
+                {products.map((product) => (
+                  <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-foreground text-sm">{product.name}</h3>
+                            <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                          </div>
+                          <Badge className={`text-xs ${getCategoryColor(product.category)}`}>
+                            {product.category}
+                          </Badge>
                         </div>
-                        <Badge className={`text-xs ${getCategoryColor(product.category)}`}>
-                          {product.category}
-                        </Badge>
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-lg font-bold text-green-600">PKR {product.price?.toLocaleString()}</span>
+                          <span className="text-xs text-muted-foreground">per {product.unit}</span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <Badge variant={product.stock <= product.minStock ? "destructive" : "default"}>
+                            {product.stock} {product.unit}s
+                          </Badge>
+                          {product.stock <= product.minStock && (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => openEditDialog(product)}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteProduct(product.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {pagination.totalPages > 1 && (
+                <div className="mt-6 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(pagination.currentPage - 1)}
+                          className={pagination.currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
                       
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-green-600">PKR {product.price?.toLocaleString()}</span>
-                        <span className="text-xs text-muted-foreground">per {product.unit}</span>
-                      </div>
+                      {/* First page */}
+                      {pagination.currentPage > 2 && (
+                        <>
+                          <PaginationItem>
+                            <PaginationLink 
+                              onClick={() => handlePageChange(1)}
+                              className="cursor-pointer"
+                            >
+                              1
+                            </PaginationLink>
+                          </PaginationItem>
+                          {pagination.currentPage > 3 && (
+                            <PaginationItem>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          )}
+                        </>
+                      )}
                       
-                      <div className="flex justify-between items-center">
-                        <Badge variant={product.stock <= product.minStock ? "destructive" : "default"}>
-                          {product.stock} {product.unit}s
-                        </Badge>
-                        {product.stock <= product.minStock && (
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
-                        )}
-                      </div>
+                      {/* Current page and adjacent pages */}
+                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(pagination.totalPages, pagination.currentPage - 2 + i));
+                        if (page < 1 || page > pagination.totalPages) return null;
+                        
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={page === pagination.currentPage}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }).filter(Boolean)}
                       
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="flex-1"
-                          onClick={() => openEditDialog(product)}
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      {/* Last page */}
+                      {pagination.currentPage < pagination.totalPages - 1 && (
+                        <>
+                          {pagination.currentPage < pagination.totalPages - 2 && (
+                            <PaginationItem>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          )}
+                          <PaginationItem>
+                            <PaginationLink 
+                              onClick={() => handlePageChange(pagination.totalPages)}
+                              className="cursor-pointer"
+                            >
+                              {pagination.totalPages}
+                            </PaginationLink>
+                          </PaginationItem>
+                        </>
+                      )}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(pagination.currentPage + 1)}
+                          className={pagination.currentPage >= pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+
+              {/* Page info */}
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                Showing {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1} to {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of {pagination.totalItems} products
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
