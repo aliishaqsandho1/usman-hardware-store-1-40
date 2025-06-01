@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,19 +20,12 @@ interface CartItem {
   unit: string;
 }
 
-interface Category {
-  id: number;
-  name: string;
-  product_count: number;
-  created_at: string;
-}
-
 const Sales = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -48,7 +40,6 @@ const Sales = () => {
 
   useEffect(() => {
     fetchProducts();
-    fetchCategories();
     fetchCustomers();
     fetchTodaysOrders();
     // Load pinned products from localStorage
@@ -66,16 +57,30 @@ const Sales = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await productsApi.getAll({ limit: 100 });
-      if (response.success) {
+      const response = await productsApi.getAll({ 
+        limit: 100,
+        status: 'active'
+      });
+      if (response.success && response.data) {
         const productsData = response.data?.products || response.data || [];
-        setProducts(Array.isArray(productsData) ? productsData : []);
+        const validProducts = Array.isArray(productsData) ? productsData : [];
+        setProducts(validProducts);
+        
+        // Extract unique categories from products
+        const uniqueCategories = [...new Set(
+          validProducts
+            .map(product => product.category)
+            .filter(category => category && typeof category === 'string')
+        )];
+        setCategories(uniqueCategories);
       } else {
         setProducts([]);
+        setCategories([]);
       }
     } catch (error) {
       console.error('Failed to fetch products:', error);
       setProducts([]);
+      setCategories([]);
       toast({
         title: "Error",
         description: "Failed to load products",
@@ -83,23 +88,6 @@ const Sales = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Categories response:', data);
-        setCategories(Array.isArray(data) ? data : []);
-      } else {
-        console.error('Failed to fetch categories:', response.status);
-        setCategories([]);
-      }
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-      setCategories([]);
     }
   };
 
@@ -280,7 +268,7 @@ const Sales = () => {
     const matchesSearch = product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product?.sku?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesCategory = selectedCategory === null || product?.categoryId === selectedCategory;
+    const matchesCategory = selectedCategory === null || product?.category === selectedCategory;
     
     return matchesSearch && matchesCategory;
   });
@@ -361,7 +349,7 @@ const Sales = () => {
               />
             </div>
 
-            {/* Category Filter Bar */}
+            {/* Dynamic Category Filter Bar */}
             <div className="bg-muted/50 border border-border rounded-lg p-3 mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
@@ -376,17 +364,20 @@ const Sales = () => {
                 >
                   All Products ({products.length})
                 </Button>
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => setSelectedCategory(category.id)}
-                  >
-                    {category.name} ({category.product_count})
-                  </Button>
-                ))}
+                {categories.map((category) => {
+                  const categoryCount = products.filter(p => p.category === category).length;
+                  return (
+                    <Button
+                      key={category}
+                      variant={selectedCategory === category ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setSelectedCategory(category)}
+                    >
+                      {category} ({categoryCount})
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </div>
