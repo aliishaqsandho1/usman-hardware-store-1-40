@@ -7,21 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { customerTypes, Customer, CustomerType } from "@/data/storeData";
+import { customersApi } from "@/services/api";
 
 interface QuickCustomerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCustomerCreated: (customer: Customer) => void;
+  onCustomerCreated: (customer: any) => void;
 }
 
 export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: QuickCustomerFormProps) {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [customerType, setCustomerType] = useState<CustomerType>("regular");
+  const [email, setEmail] = useState("");
+  const [customerType, setCustomerType] = useState("individual");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [creditLimit, setCreditLimit] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!name.trim() || !phone.trim()) {
@@ -33,27 +38,53 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
       return;
     }
 
-    const newCustomer: Customer = {
-      id: Date.now(), // Simple ID generation
-      name: name.trim(),
-      phone: phone.trim(),
-      address: customerType === "walk-in" ? "Walk-in" : "Address not provided",
-      dueAmount: 0,
-      type: customerType
-    };
+    setIsSubmitting(true);
 
-    onCustomerCreated(newCustomer);
-    
-    // Reset form
-    setName("");
-    setPhone("");
-    setCustomerType("regular");
-    onOpenChange(false);
+    try {
+      const customerData = {
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        type: customerType,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        creditLimit: creditLimit ? parseFloat(creditLimit) : 0
+      };
 
-    toast({
-      title: "Customer Added",
-      description: `${newCustomer.name} has been added successfully`,
-    });
+      console.log('Creating customer with data:', customerData);
+
+      const response = await customersApi.create(customerData);
+      
+      if (response.success) {
+        onCustomerCreated(response.data);
+        
+        // Reset form
+        setName("");
+        setPhone("");
+        setEmail("");
+        setCustomerType("individual");
+        setAddress("");
+        setCity("");
+        setCreditLimit("");
+        onOpenChange(false);
+
+        toast({
+          title: "Customer Added",
+          description: `${response.data.name} has been added successfully`,
+        });
+      } else {
+        throw new Error(response.message || 'Failed to create customer');
+      }
+    } catch (error) {
+      console.error('Failed to create customer:', error);
+      toast({
+        title: "Error",
+        description: `Failed to create customer: ${error.message || 'Unknown error'}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -75,6 +106,7 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="border-gray-300"
+              disabled={isSubmitting}
             />
           </div>
           
@@ -86,23 +118,71 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="border-gray-300"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="border-gray-300"
+              disabled={isSubmitting}
             />
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="type">Customer Type</Label>
-            <Select value={customerType} onValueChange={(value: CustomerType) => setCustomerType(value)}>
+            <Select value={customerType} onValueChange={setCustomerType} disabled={isSubmitting}>
               <SelectTrigger className="border-gray-300">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {customerTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="business">Business</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              placeholder="Enter address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="border-gray-300"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              placeholder="Enter city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="border-gray-300"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="creditLimit">Credit Limit (PKR)</Label>
+            <Input
+              id="creditLimit"
+              type="number"
+              placeholder="Enter credit limit"
+              value={creditLimit}
+              onChange={(e) => setCreditLimit(e.target.value)}
+              className="border-gray-300"
+              disabled={isSubmitting}
+            />
           </div>
           
           <div className="flex gap-2 pt-4">
@@ -111,14 +191,16 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="flex-1"
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               className="flex-1 bg-blue-600 hover:bg-blue-700"
+              disabled={isSubmitting}
             >
-              Add Customer
+              {isSubmitting ? "Adding..." : "Add Customer"}
             </Button>
           </div>
         </form>
