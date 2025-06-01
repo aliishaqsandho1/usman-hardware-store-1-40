@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { customersApi } from "@/services/api";
@@ -19,11 +18,6 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [customerType, setCustomerType] = useState("individual");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [creditLimit, setCreditLimit] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,11 +38,8 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
       const customerData = {
         name: name.trim(),
         phone: phone.trim(),
-        email: email.trim() || undefined,
-        type: customerType,
-        address: address.trim() || undefined,
-        city: city.trim() || undefined,
-        creditLimit: creditLimit ? parseFloat(creditLimit) : 0
+        type: "individual",
+        creditLimit: 0
       };
 
       console.log('Creating customer with data:', customerData);
@@ -61,11 +52,6 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
         // Reset form
         setName("");
         setPhone("");
-        setEmail("");
-        setCustomerType("individual");
-        setAddress("");
-        setCity("");
-        setCreditLimit("");
         onOpenChange(false);
 
         toast({
@@ -117,69 +103,6 @@ export function QuickCustomerForm({ open, onOpenChange, onCustomerCreated }: Qui
               placeholder="Enter phone number"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="border-gray-300"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="Enter email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="border-gray-300"
-              disabled={isSubmitting}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="type">Customer Type</Label>
-            <Select value={customerType} onValueChange={setCustomerType} disabled={isSubmitting}>
-              <SelectTrigger className="border-gray-300">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="business">Business</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              placeholder="Enter address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="border-gray-300"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="city">City</Label>
-            <Input
-              id="city"
-              placeholder="Enter city"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="border-gray-300"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="creditLimit">Credit Limit (PKR)</Label>
-            <Input
-              id="creditLimit"
-              type="number"
-              placeholder="Enter credit limit"
-              value={creditLimit}
-              onChange={(e) => setCreditLimit(e.target.value)}
               className="border-gray-300"
               disabled={isSubmitting}
             />
