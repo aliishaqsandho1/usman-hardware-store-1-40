@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,27 +7,134 @@ import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Eye, FileText, CreditCard, Receipt, DollarSign, Stamp } from "lucide-react";
-import { salesReceipts as initialSalesReceipts, SalesReceipt } from "@/data/storeData";
+import { Search, Eye, FileText, CreditCard, Receipt, DollarSign, Download, Print } from "lucide-react";
+import { salesApi } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
+
+interface SalesReceipt {
+  id: number;
+  orderNumber: string;
+  customerId: number | null;
+  customerName: string;
+  customerDetails?: {
+    email: string;
+    phone: string;
+    address: string;
+  };
+  date: string;
+  time: string;
+  items: Array<{
+    productId: number;
+    productName: string;
+    sku?: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paymentMethod: string;
+  status: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
 
 const SalesReceipts = () => {
-  const [salesReceipts] = useState(initialSalesReceipts);
+  const { toast } = useToast();
+  const [salesReceipts, setSalesReceipts] = useState<SalesReceipt[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<SalesReceipt | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSalesReceipts();
+  }, []);
+
+  const fetchSalesReceipts = async () => {
+    try {
+      setLoading(true);
+      const response = await salesApi.getAll({ 
+        limit: 100,
+        status: 'completed'
+      });
+      
+      if (response.success) {
+        const receiptsData = response.data?.sales || response.data || [];
+        setSalesReceipts(Array.isArray(receiptsData) ? receiptsData : []);
+      } else {
+        setSalesReceipts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch sales receipts:', error);
+      setSalesReceipts([]);
+      toast({
+        title: "Error",
+        description: "Failed to load sales receipts",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredReceipts = salesReceipts.filter(receipt =>
-    receipt.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    receipt.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     receipt.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    receipt.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    receipt.id.toString().includes(searchTerm.toLowerCase())
   );
 
   const totalCashSales = salesReceipts
     .filter(r => r.paymentMethod === "cash")
-    .reduce((sum, r) => sum + r.totalAmount, 0);
+    .reduce((sum, r) => sum + r.total, 0);
 
   const totalCreditSales = salesReceipts
     .filter(r => r.paymentMethod === "credit")
-    .reduce((sum, r) => sum + r.totalAmount, 0);
+    .reduce((sum, r) => sum + r.total, 0);
+
+  const handlePrintReceipt = () => {
+    window.print();
+  };
+
+  const handleDownloadReceipt = () => {
+    if (selectedReceipt) {
+      const element = document.getElementById('receipt-content');
+      if (element) {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(`
+            <html>
+              <head>
+                <title>Receipt - ${selectedReceipt.orderNumber}</title>
+                <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  .receipt { max-width: 400px; margin: 0 auto; }
+                  @media print { body { margin: 0; } }
+                </style>
+              </head>
+              <body>
+                ${element.innerHTML}
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+          printWindow.print();
+        }
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 p-6 space-y-6 bg-slate-50 min-h-screen">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-slate-600">Loading sales receipts...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-6 space-y-6 bg-slate-50 min-h-screen">
@@ -100,7 +207,7 @@ const SalesReceipts = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
             <Input
-              placeholder="Search by receipt ID, invoice number, or customer name..."
+              placeholder="Search by order number, receipt ID, or customer name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 border-slate-300 focus:border-blue-700 focus:ring-blue-700"
@@ -131,10 +238,10 @@ const SalesReceipts = () => {
                 <TableRow key={receipt.id} className="hover:bg-slate-50">
                   <TableCell>
                     <div>
-                      <p className="font-medium text-slate-900">{receipt.id}</p>
-                      <p className="text-sm text-slate-500">Invoice: {receipt.invoiceNumber}</p>
+                      <p className="font-medium text-slate-900">{receipt.orderNumber}</p>
+                      <p className="text-sm text-slate-500">ID: {receipt.id}</p>
                       <p className="text-sm text-slate-500">Date: {receipt.date} at {receipt.time}</p>
-                      <p className="text-sm text-slate-500">Cashier: {receipt.cashier}</p>
+                      <p className="text-sm text-slate-500">By: {receipt.createdBy}</p>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -151,9 +258,12 @@ const SalesReceipts = () => {
                     </p>
                   </TableCell>
                   <TableCell>
-                    <p className="font-medium text-slate-900">Rs. {receipt.totalAmount.toLocaleString()}</p>
-                    {receipt.taxAmount > 0 && (
-                      <p className="text-xs text-slate-500">Tax: Rs. {receipt.taxAmount}</p>
+                    <p className="font-medium text-slate-900">Rs. {receipt.total.toLocaleString()}</p>
+                    {receipt.discount > 0 && (
+                      <p className="text-xs text-green-600">Discount: Rs. {receipt.discount}</p>
+                    )}
+                    {receipt.tax > 0 && (
+                      <p className="text-xs text-slate-500">Tax: Rs. {receipt.tax}</p>
                     )}
                   </TableCell>
                   <TableCell>
@@ -188,7 +298,19 @@ const SalesReceipts = () => {
       <Dialog open={!!selectedReceipt} onOpenChange={() => setSelectedReceipt(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Receipt Details - {selectedReceipt?.id}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-slate-900">Receipt - {selectedReceipt?.orderNumber}</DialogTitle>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleDownloadReceipt}>
+                  <Download className="h-4 w-4 mr-1" />
+                  Download
+                </Button>
+                <Button size="sm" variant="outline" onClick={handlePrintReceipt}>
+                  <Print className="h-4 w-4 mr-1" />
+                  Print
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
           {selectedReceipt && <ReceiptDetails receipt={selectedReceipt} />}
         </DialogContent>
@@ -197,136 +319,138 @@ const SalesReceipts = () => {
   );
 };
 
-// Receipt Details Component with Authentication Elements
+// Enhanced Receipt Details Component for Printing
 const ReceiptDetails = ({ receipt }: { receipt: SalesReceipt }) => (
-  <div className="space-y-6 bg-white p-6 rounded-lg border">
-    {/* Header with Store Info */}
-    <div className="text-center border-b pb-4 relative">
-      <div className="absolute top-0 right-0">
-        <Stamp className="h-8 w-8 text-blue-700 opacity-50" />
+  <div id="receipt-content" className="bg-white">
+    {/* Modern Receipt Design */}
+    <div className="max-w-md mx-auto bg-white shadow-lg rounded-lg overflow-hidden border">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 text-center">
+        <h1 className="text-2xl font-bold">USMAN HARDWARE</h1>
+        <p className="text-blue-100 text-sm">Furniture Hardware Specialist</p>
+        <p className="text-blue-100 text-xs">Hafizabad, Punjab, Pakistan</p>
+        <p className="text-blue-100 text-xs">Phone: +92-300-1234567</p>
       </div>
-      <h2 className="text-2xl font-bold text-slate-900">Usman Hardware Store</h2>
-      <p className="text-sm text-slate-600">Furniture Hardware Specialist</p>
-      <p className="text-sm text-slate-600">Hafizabad, Punjab, Pakistan</p>
-      <p className="text-sm text-slate-600">Phone: +92-300-1234567</p>
-      <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
-        <p className="text-lg font-bold text-blue-900">Receipt: {receipt.id}</p>
-        <p className="text-sm text-blue-700">Invoice: {receipt.invoiceNumber}</p>
-      </div>
-    </div>
 
-    {/* Customer and Transaction Info */}
-    <div className="grid grid-cols-2 gap-6">
-      <div className="space-y-2">
-        <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-1">Customer Information</h3>
-        <p><strong>Name:</strong> {receipt.customerName}</p>
-        {receipt.customerId && <p><strong>Customer ID:</strong> {receipt.customerId}</p>}
+      {/* Receipt Info */}
+      <div className="bg-gray-50 px-6 py-4 border-b">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-sm text-gray-600">Receipt No.</p>
+            <p className="font-bold text-lg">{receipt.orderNumber}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Date & Time</p>
+            <p className="font-semibold">{receipt.date}</p>
+            <p className="text-sm text-gray-500">{receipt.time}</p>
+          </div>
+        </div>
       </div>
-      
-      <div className="space-y-2">
-        <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-1">Transaction Details</h3>
-        <p><strong>Date:</strong> {receipt.date}</p>
-        <p><strong>Time:</strong> {receipt.time}</p>
-        <p><strong>Cashier:</strong> {receipt.cashier}</p>
-        <p><strong>Payment:</strong> 
-          <Badge className="ml-2" variant={receipt.paymentMethod === "cash" ? "default" : "secondary"}>
+
+      {/* Customer Info */}
+      <div className="px-6 py-4 border-b">
+        <div className="flex justify-between">
+          <div>
+            <p className="text-sm text-gray-600">Customer</p>
+            <p className="font-semibold">{receipt.customerName}</p>
+            {receipt.customerDetails?.phone && (
+              <p className="text-sm text-gray-500">{receipt.customerDetails.phone}</p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Cashier</p>
+            <p className="font-semibold">{receipt.createdBy}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="px-6 py-4">
+        <h3 className="font-semibold text-gray-800 mb-3 border-b pb-2">Items Purchased</h3>
+        <div className="space-y-3">
+          {receipt.items.map((item, index) => (
+            <div key={index} className="flex justify-between items-start">
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">{item.productName}</p>
+                {item.sku && <p className="text-xs text-gray-500">SKU: {item.sku}</p>}
+                <p className="text-sm text-gray-600">
+                  {item.quantity} × Rs. {item.unitPrice.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold">Rs. {item.total.toLocaleString()}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Totals */}
+      <div className="px-6 py-4 border-t bg-gray-50">
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Subtotal:</span>
+            <span>Rs. {receipt.subtotal.toLocaleString()}</span>
+          </div>
+          {receipt.discount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Discount:</span>
+              <span>- Rs. {receipt.discount.toLocaleString()}</span>
+            </div>
+          )}
+          {receipt.tax > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Tax:</span>
+              <span>Rs. {receipt.tax.toLocaleString()}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-lg pt-2 border-t">
+            <span>Total:</span>
+            <span className="text-green-600">Rs. {receipt.total.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Method */}
+      <div className="px-6 py-3 bg-blue-50 border-t">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Payment Method:</span>
+          <Badge className={receipt.paymentMethod === "cash" ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
             {receipt.paymentMethod.toUpperCase()}
           </Badge>
-        </p>
-      </div>
-    </div>
-    
-    {/* Items Table */}
-    <div>
-      <h3 className="font-semibold text-slate-900 mb-3 border-b border-slate-200 pb-1">Items Purchased</h3>
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-slate-50">
-            <TableHead className="text-slate-700">Product</TableHead>
-            <TableHead className="text-slate-700">Quantity</TableHead>
-            <TableHead className="text-slate-700">Unit Price</TableHead>
-            <TableHead className="text-slate-700">Total</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {receipt.items.map((item, index) => (
-            <TableRow key={index} className="border-b border-slate-100">
-              <TableCell className="text-slate-900">{item.productName}</TableCell>
-              <TableCell className="text-slate-700">{item.quantity}</TableCell>
-              <TableCell className="text-slate-700">Rs. {item.unitPrice.toLocaleString()}</TableCell>
-              <TableCell className="text-slate-900 font-medium">Rs. {item.total.toLocaleString()}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      
-      {/* Totals Section */}
-      <div className="border-t-2 border-slate-300 pt-4 mt-4 space-y-2">
-        <div className="flex justify-between text-slate-700">
-          <span>Subtotal:</span>
-          <span>Rs. {(receipt.totalAmount - receipt.taxAmount + receipt.discountAmount).toLocaleString()}</span>
-        </div>
-        {receipt.discountAmount > 0 && (
-          <div className="flex justify-between text-emerald-700">
-            <span>Discount:</span>
-            <span>- Rs. {receipt.discountAmount.toLocaleString()}</span>
-          </div>
-        )}
-        {receipt.taxAmount > 0 && (
-          <div className="flex justify-between text-slate-700">
-            <span>Tax (10%):</span>
-            <span>Rs. {receipt.taxAmount.toLocaleString()}</span>
-          </div>
-        )}
-        <div className="flex justify-between items-center font-bold text-lg text-slate-900 bg-slate-100 p-3 rounded">
-          <span>Total Amount:</span>
-          <span>Rs. {receipt.totalAmount.toLocaleString()}</span>
         </div>
       </div>
-    </div>
 
-    {/* Notes Section */}
-    {receipt.notes && (
-      <div className="bg-amber-50 border border-amber-200 rounded p-3">
-        <h4 className="font-medium text-amber-900 mb-1">Notes:</h4>
-        <p className="text-amber-800 text-sm">{receipt.notes}</p>
-      </div>
-    )}
+      {/* Notes */}
+      {receipt.notes && (
+        <div className="px-6 py-3 border-t">
+          <p className="text-sm text-gray-600">Notes:</p>
+          <p className="text-sm text-gray-800">{receipt.notes}</p>
+        </div>
+      )}
 
-    {/* Authentication Section */}
-    <div className="border-t-2 border-slate-300 pt-4 space-y-4">
-      <div className="grid grid-cols-2 gap-8">
-        <div className="text-center">
-          <div className="border-b border-slate-400 mb-2 pb-8"></div>
-          <p className="text-sm text-slate-600">Customer Signature</p>
-        </div>
-        <div className="text-center">
-          <div className="border-b border-slate-400 mb-2 pb-8 relative">
-            <span className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-lg font-script text-slate-700">
-              Muhammad Usman
-            </span>
-          </div>
-          <p className="text-sm text-slate-600">Authorized Signature</p>
-          <p className="text-xs text-slate-500">(Store Manager)</p>
+      {/* Footer */}
+      <div className="px-6 py-4 border-t text-center">
+        <p className="text-xs text-gray-500 mb-2">Thank you for your business!</p>
+        <p className="text-xs text-gray-400">For queries: +92-300-1234567</p>
+        <div className="mt-4 pt-3 border-t border-dashed">
+          <p className="text-xs text-gray-400">
+            Generated: {new Date().toLocaleString()}
+          </p>
         </div>
       </div>
-      
-      {/* Store Stamp */}
-      <div className="text-center mt-6">
-        <div className="inline-block border-2 border-blue-700 rounded-full p-4 bg-blue-50">
-          <div className="text-center">
-            <p className="text-xs font-bold text-blue-900">USMAN HARDWARE</p>
-            <p className="text-xs text-blue-700">HAFIZABAD</p>
-            <Stamp className="h-4 w-4 text-blue-700 mx-auto mt-1" />
-          </div>
-        </div>
-      </div>
-    </div>
 
-    {/* Footer */}
-    <div className="text-center text-xs text-slate-500 border-t border-slate-200 pt-4">
-      <p>Thank you for your business! For queries, contact: +92-300-1234567</p>
-      <p>Generated on: {new Date().toLocaleString()}</p>
+      {/* Barcode Placeholder */}
+      <div className="px-6 py-2 border-t text-center bg-gray-50">
+        <div className="inline-block">
+          <div className="flex space-x-1">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="w-1 h-8 bg-gray-800" style={{height: `${Math.random() * 20 + 20}px`}}></div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{receipt.orderNumber}</p>
+        </div>
+      </div>
     </div>
   </div>
 );
