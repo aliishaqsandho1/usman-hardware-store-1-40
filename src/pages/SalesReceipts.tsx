@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Eye, FileText, CreditCard, Receipt, DollarSign, Download, Print } from "lucide-react";
+import { Search, Eye, FileText, CreditCard, Receipt, DollarSign, Download, Printer } from "lucide-react";
 import { salesApi } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -306,7 +306,7 @@ const SalesReceipts = () => {
                   Download
                 </Button>
                 <Button size="sm" variant="outline" onClick={handlePrintReceipt}>
-                  <Print className="h-4 w-4 mr-1" />
+                  <Printer className="h-4 w-4 mr-1" />
                   Print
                 </Button>
               </div>
