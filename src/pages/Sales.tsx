@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Package, Search, Plus, Minus, Pin, PinOff } from "lucide-react";
+import { Package, Search, Plus, Minus, Pin, PinOff, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { salesApi, customersApi, productsApi } from "@/services/api";
 import { QuickCustomerForm } from "@/components/QuickCustomerForm";
@@ -20,10 +21,19 @@ interface CartItem {
   unit: string;
 }
 
+interface Category {
+  id: number;
+  name: string;
+  product_count: number;
+  created_at: string;
+}
+
 const Sales = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -38,6 +48,7 @@ const Sales = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
     fetchCustomers();
     fetchTodaysOrders();
     // Load pinned products from localStorage
@@ -72,6 +83,23 @@ const Sales = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/categories');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Categories response:', data);
+        setCategories(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Failed to fetch categories:', response.status);
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      setCategories([]);
     }
   };
 
@@ -205,14 +233,18 @@ const Sales = () => {
     try {
       const saleData = {
         customerId: selectedCustomer?.id || null,
+        customerName: selectedCustomer?.name || "Walk-in Customer",
         items: cart.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
-          unitPrice: item.price
+          unitPrice: item.price,
+          totalPrice: item.price * item.quantity
         })),
+        totalAmount: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
         discount: 0,
         paymentMethod: paymentMethod,
         status: orderStatus,
+        saleDate: new Date().toISOString(),
         notes: selectedCustomer ? `Sale to ${selectedCustomer.name}` : "Walk-in customer sale"
       };
 
@@ -227,24 +259,31 @@ const Sales = () => {
         setPaymentMethod("cash");
         fetchTodaysOrders();
         toast({
-          title: "Sale Completed",
-          description: `Order has been processed with status: ${orderStatus}`,
+          title: "Sale Completed Successfully",
+          description: `Order has been processed with status: ${orderStatus}. Total: PKR ${saleData.totalAmount.toFixed(2)}`,
         });
+      } else {
+        throw new Error(response.message || 'Failed to process sale');
       }
     } catch (error) {
       console.error('Failed to process sale:', error);
       toast({
-        title: "Error",
-        description: "Failed to process sale",
+        title: "Sale Failed",
+        description: `Error: ${error.message || 'Unknown error occurred'}`,
         variant: "destructive"
       });
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product?.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter products by category and search term
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product?.sku?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = selectedCategory === null || product?.categoryId === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   // Sort products: pinned first, then by name
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -320,6 +359,35 @@ const Sales = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 h-10 bg-background border-input"
               />
+            </div>
+
+            {/* Category Filter Bar */}
+            <div className="bg-muted/50 border border-border rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Filter by Category:</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={selectedCategory === null ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setSelectedCategory(null)}
+                >
+                  All Products ({products.length})
+                </Button>
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setSelectedCategory(category.id)}
+                  >
+                    {category.name} ({category.product_count})
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
 
