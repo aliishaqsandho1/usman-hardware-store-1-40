@@ -1,3 +1,4 @@
+
 const BASE_URL = 'https://zaidawn.site/wp-json/ims/v1';
 
 // API response types
@@ -292,6 +293,7 @@ export const inventoryApi = {
   getAll: (params?: {
     page?: number;
     limit?: number;
+    search?: string;
     category?: string;
     lowStock?: boolean;
     outOfStock?: boolean;
