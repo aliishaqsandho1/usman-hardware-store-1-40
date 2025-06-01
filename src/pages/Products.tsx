@@ -293,6 +293,77 @@ const Products = () => {
 
   const lowStockProducts = products.filter(product => product.stock <= product.minStock);
 
+  const renderPagination = () => {
+    if (pagination.totalPages <= 1) return null;
+
+    const { currentPage, totalPages } = pagination;
+    const pages = [];
+
+    // Always show first page
+    pages.push(1);
+
+    // Add ellipsis after first page if needed
+    if (currentPage > 3) {
+      pages.push('ellipsis-start');
+    }
+
+    // Add pages around current page
+    const startPage = Math.max(2, currentPage - 1);
+    const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+    for (let i = startPage; i <= endPage; i++) {
+      if (!pages.includes(i)) {
+        pages.push(i);
+      }
+    }
+
+    // Add ellipsis before last page if needed
+    if (currentPage < totalPages - 2) {
+      pages.push('ellipsis-end');
+    }
+
+    // Always show last page (if different from first)
+    if (totalPages > 1 && !pages.includes(totalPages)) {
+      pages.push(totalPages);
+    }
+
+    return (
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious 
+              onClick={() => handlePageChange(currentPage - 1)}
+              className={currentPage <= 1 ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"}
+            />
+          </PaginationItem>
+          
+          {pages.map((page, index) => (
+            <PaginationItem key={index}>
+              {page === 'ellipsis-start' || page === 'ellipsis-end' ? (
+                <PaginationEllipsis />
+              ) : (
+                <PaginationLink
+                  onClick={() => handlePageChange(page as number)}
+                  isActive={currentPage === page}
+                  className="cursor-pointer"
+                >
+                  {page}
+                </PaginationLink>
+              )}
+            </PaginationItem>
+          ))}
+          
+          <PaginationItem>
+            <PaginationNext 
+              onClick={() => handlePageChange(currentPage + 1)}
+              className={currentPage >= totalPages ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    );
+  };
+
   if (loading && products.length === 0) {
     return (
       <div className="flex-1 p-6 space-y-6 min-h-screen bg-background">
@@ -558,79 +629,7 @@ const Products = () => {
               {/* Pagination Controls */}
               {pagination.totalPages > 1 && (
                 <div className="mt-6 flex justify-center">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => handlePageChange(pagination.currentPage - 1)}
-                          className={pagination.currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                      
-                      {/* First page */}
-                      {pagination.currentPage > 2 && (
-                        <>
-                          <PaginationItem>
-                            <PaginationLink 
-                              onClick={() => handlePageChange(1)}
-                              className="cursor-pointer"
-                            >
-                              1
-                            </PaginationLink>
-                          </PaginationItem>
-                          {pagination.currentPage > 3 && (
-                            <PaginationItem>
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          )}
-                        </>
-                      )}
-                      
-                      {/* Current page and adjacent pages */}
-                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                        const page = Math.max(1, Math.min(pagination.totalPages, pagination.currentPage - 2 + i));
-                        if (page < 1 || page > pagination.totalPages) return null;
-                        
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={page === pagination.currentPage}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      }).filter(Boolean)}
-                      
-                      {/* Last page */}
-                      {pagination.currentPage < pagination.totalPages - 1 && (
-                        <>
-                          {pagination.currentPage < pagination.totalPages - 2 && (
-                            <PaginationItem>
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          )}
-                          <PaginationItem>
-                            <PaginationLink 
-                              onClick={() => handlePageChange(pagination.totalPages)}
-                              className="cursor-pointer"
-                            >
-                              {pagination.totalPages}
-                            </PaginationLink>
-                          </PaginationItem>
-                        </>
-                      )}
-                      
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => handlePageChange(pagination.currentPage + 1)}
-                          className={pagination.currentPage >= pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+                  {renderPagination()}
                 </div>
               )}
 

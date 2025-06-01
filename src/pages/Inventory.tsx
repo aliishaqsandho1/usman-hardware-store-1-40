@@ -271,39 +271,33 @@ const Inventory = () => {
     if (totalPages <= 1) return null;
 
     const pages = [];
-    const showEllipsis = totalPages > 7;
 
-    if (showEllipsis) {
-      // Show first page
-      pages.push(1);
-      
-      // Show ellipsis if current page is far from start
-      if (currentPage > 4) {
-        pages.push('ellipsis-start');
-      }
-      
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      
-      for (let i = start; i <= end; i++) {
+    // Always show first page
+    pages.push(1);
+
+    // Add ellipsis after first page if needed
+    if (currentPage > 3) {
+      pages.push('ellipsis-start');
+    }
+
+    // Add pages around current page
+    const startPage = Math.max(2, currentPage - 1);
+    const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+    for (let i = startPage; i <= endPage; i++) {
+      if (!pages.includes(i)) {
         pages.push(i);
       }
-      
-      // Show ellipsis if current page is far from end
-      if (currentPage < totalPages - 3) {
-        pages.push('ellipsis-end');
-      }
-      
-      // Show last page
-      if (totalPages > 1) {
-        pages.push(totalPages);
-      }
-    } else {
-      // Show all pages
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
+    }
+
+    // Add ellipsis before last page if needed
+    if (currentPage < totalPages - 2) {
+      pages.push('ellipsis-end');
+    }
+
+    // Always show last page (if different from first)
+    if (totalPages > 1 && !pages.includes(totalPages)) {
+      pages.push(totalPages);
     }
 
     return (
@@ -311,14 +305,8 @@ const Inventory = () => {
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious 
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                if (currentPage > 1) {
-                  setCurrentPage(currentPage - 1);
-                }
-              }}
-              className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              className={currentPage <= 1 ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"}
             />
           </PaginationItem>
           
@@ -328,12 +316,9 @@ const Inventory = () => {
                 <PaginationEllipsis />
               ) : (
                 <PaginationLink
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage(page as number);
-                  }}
+                  onClick={() => setCurrentPage(page as number)}
                   isActive={currentPage === page}
+                  className="cursor-pointer"
                 >
                   {page}
                 </PaginationLink>
@@ -343,14 +328,8 @@ const Inventory = () => {
           
           <PaginationItem>
             <PaginationNext
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                if (currentPage < totalPages) {
-                  setCurrentPage(currentPage + 1);
-                }
-              }}
-              className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              className={currentPage >= totalPages ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"}
             />
           </PaginationItem>
         </PaginationContent>
